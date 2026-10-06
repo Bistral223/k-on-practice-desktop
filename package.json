@@ -1,0 +1,48 @@
+{
+  "name": "k-on-practice-desktop",
+  "productName": "K-on practice",
+  "version": "1.0.0",
+  "description": "K-on practice のパソコン用アプリ（Songsterr を右側に埋め込んで表示）",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-packager . \"K-on practice\" --platform=win32 --arch=x64 --icon=icon.ico --out=dist --overwrite --ignore=^/dist",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "author": "K-on practice",
+  "build": {
+    "appId": "app.k-on-practice.desktop",
+    "productName": "K-on practice",
+    "artifactName": "K-on-practice-Setup.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "app-preload.js",
+      "panel-preload.js",
+      "panel.html",
+      "icon.ico",
+      "icon.png"
+    ],
+    "win": {
+      "icon": "icon.ico",
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "K-on practice",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
