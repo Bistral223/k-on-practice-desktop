@@ -1,17 +1,16 @@
 {
   "name": "k-on-practice-desktop",
   "productName": "K-on practice",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "K-on practice のパソコン用アプリ（Songsterr を右側に埋め込んで表示）",
   "main": "main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
-    "pack": "electron-packager . \"K-on practice\" --platform=win32 --arch=x64 --icon=icon.ico --out=dist --overwrite --ignore=^/dist",
-    "dist": "electron-builder --win nsis --x64"
+    "dist": "electron-builder --win nsis --x64",
+    "dist:mac": "electron-builder --mac dmg --universal"
   },
   "devDependencies": {
-    "@electron/packager": "^20.3.0",
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3"
   },
@@ -19,7 +18,6 @@
   "build": {
     "appId": "app.k-on-practice.desktop",
     "productName": "K-on practice",
-    "artifactName": "K-on-practice-Setup.${ext}",
     "directories": {
       "output": "release"
     },
@@ -35,7 +33,8 @@
     ],
     "win": {
       "icon": "icon.ico",
-      "target": "nsis"
+      "target": "nsis",
+      "artifactName": "K-on-practice-Setup.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -60,7 +59,20 @@
         "owner": "Bistral223",
         "repo": "k-on-practice-desktop"
       }
-    ]
+    ],
+    "mac": {
+      "icon": "icon-mac.png",
+      "category": "public.app-category.music",
+      "target": "dmg",
+      "artifactName": "K-on-practice-mac.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "K-on practice",
+      "artifactName": "K-on-practice-mac.${ext}"
+    }
   },
   "dependencies": {
     "electron-updater": "^6.8.9"

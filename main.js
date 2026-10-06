@@ -13,7 +13,10 @@ const DIV = 6;    // 仕切り（ドラッグして幅を変える）の幅
 const MIN_APP = 640, MIN_PANEL = 360;
 
 // Google のログインが「安全でないブラウザ」と判定されないよう、普通の Chrome と同じ名乗りにする
-app.userAgentFallback = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
+const IS_MAC = process.platform === 'darwin';
+const UA_OS = IS_MAC ? 'Macintosh; Intel Mac OS X 10_15_7' : 'Windows NT 10.0; Win64; x64';
+app.userAgentFallback = `Mozilla/5.0 (${UA_OS}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
+const ICON = path.join(__dirname, IS_MAC ? 'icon.png' : 'icon.ico');
 
 if (process.env.KON_DEBUG_PORT) app.commandLine.appendSwitch('remote-debugging-port', process.env.KON_DEBUG_PORT);
 if (process.env.KON_USER_DATA) app.setPath('userData', process.env.KON_USER_DATA); // 動作確認用
@@ -125,7 +128,7 @@ function createWindow() {
   loadCfg();
   win = new BaseWindow({
     ...cfg.bounds, minWidth: 700, minHeight: 500,
-    title: 'K-on practice', icon: path.join(__dirname, 'icon.ico'), backgroundColor: '#15171c', show: false,
+    title: 'K-on practice', icon: ICON, backgroundColor: '#15171c', show: false,
   });
   if (cfg.maximized) win.maximize();
 
@@ -154,7 +157,7 @@ function createWindow() {
   // アプリから開くページ：Google ログインはアプリ内の小さなウィンドウ、それ以外はふだんのブラウザで開く
   appView.webContents.setWindowOpenHandler(({ url }) => {
     if (isAuthUrl(url) || url === 'about:blank') {
-      return { action: 'allow', overrideBrowserWindowOptions: { width: 520, height: 680, autoHideMenuBar: true, icon: path.join(__dirname, 'icon.ico') } };
+      return { action: 'allow', overrideBrowserWindowOptions: { width: 520, height: 680, autoHideMenuBar: true, icon: ICON } };
     }
     if (/^https?:\/\/(www\.)?songsterr\.com\//.test(url)) { openPanel(url); return { action: 'deny' }; }
     if (/^https?:/.test(url)) shell.openExternal(url);
@@ -232,16 +235,24 @@ ipcMain.on('kon:panel', (_e, cmd, arg) => {
   }
 });
 
+// マックでは kon-practice:// のリンクは open-url で届く
+app.on('open-url', (e, url) => { e.preventDefault(); handleProtocolUrl(url); });
 app.on('second-instance', (_e, argv) => {
   const u = argv.find(a => a.startsWith(PROTO + '://'));
   if (u) { handleProtocolUrl(u); return; }
   if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
 });
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
+  // Windows はメニューなし。マックは上のメニューが無いとコピー・貼り付け（⌘C・⌘V）や終了（⌘Q）が効かないので、最低限だけ
+  Menu.setApplicationMenu(IS_MAC ? Menu.buildFromTemplate([
+    { role: 'appMenu' }, { role: 'editMenu' },
+    { label: '表示', submenu: [{ label: '再読み込み', accelerator: 'CmdOrCtrl+R', click: () => appView?.webContents.reload() }, { role: 'togglefullscreen' }] },
+    { role: 'windowMenu' },
+  ]) : null);
   createWindow();
   // 新しい版が GitHub に出ていれば、裏でダウンロードして次に起動したときに更新する
-  if (app.isPackaged) {
+  // （マックの自動更新は Apple の署名が必要なので、今は Windows だけ）
+  if (app.isPackaged && !IS_MAC) {
     try { require('electron-updater').autoUpdater.checkForUpdatesAndNotify().catch(() => {}); } catch {}
   }
 });

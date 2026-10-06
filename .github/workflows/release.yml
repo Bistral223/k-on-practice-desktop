@@ -1,0 +1,60 @@
+# v1.2.3 のようなタグを push すると、Windows 版とマック版を作って GitHub のリリースに置く
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            cmd: npx electron-builder --win nsis --x64 --publish never
+            files: |
+              release/K-on-practice-Setup.exe
+              release/K-on-practice-Setup.exe.blockmap
+              release/latest.yml
+          - os: macos-latest
+            cmd: npx electron-builder --mac dmg --universal --publish never
+            files: |
+              release/K-on-practice-mac.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: ${{ matrix.cmd }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false' # 署名の証明書は使わない（マックは簡易署名のみ）
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: GitHub のリリースに置く
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "K-on practice パソコン版 ${GITHUB_REF_NAME#v}" \
+            --notes "Windows 版：K-on-practice-Setup.exe ／ マック版：K-on-practice-mac.dmg"
