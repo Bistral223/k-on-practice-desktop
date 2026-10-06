@@ -1,7 +1,7 @@
 {
   "name": "k-on-practice-desktop",
   "productName": "K-on practice",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "K-on practice のパソコン用アプリ（Songsterr を右側に埋め込んで表示）",
   "main": "main.js",
   "private": true,
@@ -29,7 +29,9 @@
       "panel-preload.js",
       "panel.html",
       "icon.ico",
-      "icon.png"
+      "icon.png",
+      "node_modules/**/*",
+      "package.json"
     ],
     "win": {
       "icon": "icon.ico",
@@ -43,6 +45,24 @@
       "shortcutName": "K-on practice",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "protocols": [
+      {
+        "name": "K-on practice",
+        "schemes": [
+          "kon-practice"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Bistral223",
+        "repo": "k-on-practice-desktop"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

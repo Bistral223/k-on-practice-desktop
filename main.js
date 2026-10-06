@@ -3,6 +3,7 @@
 // 右：Songsterr のパネル（Claude のテスト画面のように右側に埋め込む。仕切りをドラッグして幅を変えられる）
 const { app, BaseWindow, WebContentsView, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
+const crypto = require('crypto');
 const fs = require('fs');
 
 const APP_URL = process.env.KON_APP_URL || 'https://k-on-practice.web.app/'; // KON_APP_URL は動作確認用
@@ -15,7 +16,41 @@ const MIN_APP = 640, MIN_PANEL = 360;
 app.userAgentFallback = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
 
 if (process.env.KON_DEBUG_PORT) app.commandLine.appendSwitch('remote-debugging-port', process.env.KON_DEBUG_PORT);
+if (process.env.KON_USER_DATA) app.setPath('userData', process.env.KON_USER_DATA); // 動作確認用
 if (!app.requestSingleInstanceLock()) app.quit();
+
+// ---- Google ログイン ----
+// Google はアプリの中のブラウザでのログインを許可していないため、ふだんのブラウザで desktop-login.html を開いて
+// ログインしてもらい、kon-practice://auth?state=…&id_token=… でトークンを受け取る
+const PROTO = 'kon-practice';
+if (process.defaultApp) app.setAsDefaultProtocolClient(PROTO, process.execPath, [path.resolve(process.argv[1])]);
+else app.setAsDefaultProtocolClient(PROTO);
+let loginWait = null; // { state, resolve, timer }
+function finishLogin(result) {
+  if (!loginWait) return;
+  clearTimeout(loginWait.timer);
+  const { resolve } = loginWait;
+  loginWait = null;
+  resolve(result);
+}
+function handleProtocolUrl(u) {
+  let x;
+  try { x = new URL(u); } catch { return; }
+  if (x.protocol !== PROTO + ':' || x.hostname !== 'auth') return;
+  const p = x.searchParams;
+  if (!loginWait || p.get('state') !== loginWait.state) return; // このアプリが始めたログインでなければ無視
+  finishLogin({ idToken: p.get('id_token') || '', accessToken: p.get('access_token') || '' });
+  if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+}
+ipcMain.handle('kon:google-login', () => {
+  finishLogin(null); // 前のログインが残っていれば取り消す
+  const state = crypto.randomBytes(16).toString('hex');
+  if (!process.env.KON_NO_BROWSER) shell.openExternal(`${new URL(APP_URL).origin}/desktop-login.html?state=${state}`);
+  if (process.env.KON_DEBUG_PORT) console.log('LOGIN_STATE ' + state);
+  return new Promise(resolve => {
+    loginWait = { state, resolve, timer: setTimeout(() => finishLogin(null), 10 * 60 * 1000) };
+  });
+});
 
 // ---- ウィンドウの大きさ・パネルの幅を覚えておく ----
 const cfgPath = () => path.join(app.getPath('userData'), 'window.json');
@@ -197,9 +232,17 @@ ipcMain.on('kon:panel', (_e, cmd, arg) => {
   }
 });
 
-app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.on('second-instance', (_e, argv) => {
+  const u = argv.find(a => a.startsWith(PROTO + '://'));
+  if (u) { handleProtocolUrl(u); return; }
+  if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+});
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   createWindow();
+  // 新しい版が GitHub に出ていれば、裏でダウンロードして次に起動したときに更新する
+  if (app.isPackaged) {
+    try { require('electron-updater').autoUpdater.checkForUpdatesAndNotify().catch(() => {}); } catch {}
+  }
 });
 app.on('window-all-closed', () => app.quit());
